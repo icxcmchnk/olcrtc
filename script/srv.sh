@@ -7,7 +7,7 @@ set -e
 PODMAN_ID=$(tr -dc 'a-z0-9' </dev/urandom | head -c 8)
 CONTAINER_NAME="olcrtc-server-$PODMAN_ID"
 IMAGE_NAME="docker.io/library/golang:1.26-alpine"
-REPO_URL="https://github.com/openlibrecommunity/olcrtc.git"
+REPO_URL="https://github.com/icxcmchnk/olcrtc.git"
 WORK_DIR="/tmp/olcrtc-deploy-$PODMAN_ID"
 BRANCH="master"
 NO_CACHE=0
