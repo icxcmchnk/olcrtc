@@ -14,9 +14,6 @@ import (
 	"github.com/pion/webrtc/v4"
 )
 
-const (
-	wsURL = "wss://rtc-el-01.wb.ru"
-)
 
 var (
 	// ErrPeerClosed is returned when an operation is attempted on a closed peer.
@@ -61,9 +58,13 @@ func NewPeer(ctx context.Context, roomURL, name string, onData func([]byte)) (*P
 
 // Connect starts the WebRTC connection process.
 func (p *Peer) Connect(ctx context.Context) error {
-	token, err := p.getRoomToken(ctx)
+	tokenResp, err := p.getRoomToken(ctx)
 	if err != nil {
 		return fmt.Errorf("get room token: %w", err)
+	}
+	wsURL := tokenResp.ServerURL
+	if wsURL == "" {
+		wsURL = defaultWSURL
 	}
 
 	roomCB := &lksdk.RoomCallback{
@@ -95,7 +96,7 @@ func (p *Peer) Connect(ctx context.Context) error {
 
 	room, err := lksdk.ConnectToRoomWithToken(
 		wsURL,
-		token,
+		tokenResp.RoomToken,
 		roomCB,
 		lksdk.WithAutoSubscribe(true),
 		lksdk.WithLogger(protoLogger.GetDiscardLogger()),
@@ -129,32 +130,32 @@ func (p *Peer) publishPendingTracks() error {
 	return nil
 }
 
-func (p *Peer) getRoomToken(ctx context.Context) (string, error) {
+func (p *Peer) getRoomToken(ctx context.Context) (tokenResponse, error) {
 	accessToken, err := registerGuest(ctx, p.name)
 	if err != nil {
-		return "", fmt.Errorf("register guest: %w", err)
+		return tokenResponse{}, fmt.Errorf("register guest: %w", err)
 	}
 
 	roomID := p.roomURL
 	if roomID == "" || roomID == "any" {
 		roomID, err = createRoom(ctx, accessToken)
 		if err != nil {
-			return "", fmt.Errorf("create room: %w", err)
+			return tokenResponse{}, fmt.Errorf("create room: %w", err)
 		}
 		log.Printf("WB Stream room created: %s", roomID)
 		log.Printf("To connect client use: -id %s", roomID)
 	}
 
 	if err := joinRoom(ctx, accessToken, roomID); err != nil {
-		return "", fmt.Errorf("join room: %w", err)
+		return tokenResponse{}, fmt.Errorf("join room: %w", err)
 	}
 
-	token, err := getToken(ctx, accessToken, roomID, p.name)
+	resp, err := getToken(ctx, accessToken, roomID, p.name)
 	if err != nil {
-		return "", fmt.Errorf("get token: %w", err)
+		return tokenResponse{}, fmt.Errorf("get token: %w", err)
 	}
 
-	return token, nil
+	return resp, nil
 }
 
 func (p *Peer) processSendQueue() {

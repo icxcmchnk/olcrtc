@@ -14,6 +14,8 @@ import (
 
 var apiBase = "https://stream.wb.ru" //nolint:gochecknoglobals // package-level state intentional
 
+const defaultWSURL = "wss://rtc-el-02.wb.ru"
+
 var (
 	errGuestRegister = errors.New("guest register failed")
 	errCreateRoom    = errors.New("create room failed")
@@ -164,11 +166,11 @@ func joinRoom(ctx context.Context, accessToken, roomID string) error {
 	return nil
 }
 
-func getToken(ctx context.Context, accessToken, roomID, displayName string) (string, error) {
+func getToken(ctx context.Context, accessToken, roomID, displayName string) (tokenResponse, error) {
 	u := fmt.Sprintf("%s/api-room-manager/v2/room/%s/connection-details", apiBase, roomID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
-		return "", fmt.Errorf("create request: %w", err)
+		return tokenResponse{}, fmt.Errorf("create request: %w", err)
 	}
 
 	q := req.URL.Query()
@@ -182,18 +184,18 @@ func getToken(ctx context.Context, accessToken, roomID, displayName string) (str
 	client := protect.NewHTTPClient()
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("do request: %w", err)
+		return tokenResponse{}, fmt.Errorf("do request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("%w: %d %s", errGetToken, resp.StatusCode, b)
+		return tokenResponse{}, fmt.Errorf("%w: %d %s", errGetToken, resp.StatusCode, b)
 	}
 
 	var res tokenResponse
 	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
-		return "", fmt.Errorf("decode response: %w", err)
+		return tokenResponse{}, fmt.Errorf("decode response: %w", err)
 	}
-	return res.RoomToken, nil
+	return res, nil
 }
